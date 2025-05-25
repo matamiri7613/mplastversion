@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>صفحه اصلی</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Add B Nazanin Font -->
+    <style>
+        @font-face {
+            font-family: 'B Nazanin';
+            src: url('https://cdnjs.cloudflare.com/ajax/libs/BYekan/1.0/BYekan-webfont.eot');
+            src: url('https://cdnjs.cloudflare.com/ajax/libs/BYekan/1.0/BYekan-webfont.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body {
+            font-family: 'B Nazanin', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            direction: rtl;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3a7bd5, #00d2ff);
+            padding: 20px 0;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+            position: relative;
+            padding-bottom: 15px;
+        }
+        
+        h1:after {
+            content: '';
+            position: absolute;
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, #3a7bd5, #00d2ff);
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        h2 {
+            color: #3498db;
+            margin: 25px 0 15px;
+            font-size: 1.5em;
+        }
+        
+        .menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 30px 0;
+            justify-content: center;
+        }
+        
+        .menu-item {
+            background: linear-gradient(135deg, #3a7bd5, #00d2ff);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            text-align: center;
+            min-width: 160px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .menu-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            background: linear-gradient(135deg, #3494e6, #0099ff);
+        }
+        
+        .menu-item i {
+            margin-left: 8px;
+        }
+        
+        .notification-area {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            border-right: 4px solid #3498db;
+        }
+        
+        .notification-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .notification-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .notification-item.unread {
+            border-right: 4px solid #3498db;
+            background-color: #f0f8ff;
+        }
+        
+        .notification-date {
+            font-size: 13px;
+            color: #777;
+            margin-bottom: 5px;
+        }
+        
+        .notification-message {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+        
+        .notification-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'B Nazanin', Arial, sans-serif;
+            transition: background-color 0.3s;
+        }
+        
+        .notification-button:hover {
+            background-color: #2980b9;
+        }
+        
+        .flash-message {
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 6px;
+            border-right: 4px solid transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            position: relative;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            0% { opacity: 0; transform: translateY(-20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .flash-message.success {
+            background-color: #e8f5e9;
+            border-color: #4CAF50;
+            color: #388e3c;
+        }
+        
+        .flash-message.error {
+            background-color: #ffebee;
+            border-color: #f44336;
+            color: #d32f2f;
+        }
+        
+        .flash-message.info {
+            background-color: #e3f2fd;
+            border-color: #2196F3;
+            color: #1976d2;
+        }
+        
+        /* Dashboard Summary styles */
+        .dashboard-summary {
+            margin: 30px 0;
+            padding: 25px;
+            background-color: #f1f8e9;
+            border-radius: 8px;
+            border-right: 4px solid #3498db;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+        }
+        
+        .dashboard-summary-header {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .dashboard-summary-header i {
+            margin-left: 10px;
+            color: #3498db;
+        }
+        
+        .summary-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            flex: 1;
+            min-width: 200px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3498db;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .stat-icon {
+            font-size: 24px;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 14px;
+            padding: 15px;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .no-results {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 30px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .menu-item {
+                min-width: 120px;
+                font-size: 14px;
+            }
+            
+            .summary-stats {
+                flex-direction: column;
+            }
+            
+            .stat-card {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>سامانه مدیریت داده‌ها</h1>
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Dashboard Summary Section - Replaces the removed "نتایج نهایی بررسی کننده اصلی" section -->
+        {% if user_role != 'guest' %}
+        <div class="dashboard-summary">
+            <div class="dashboard-summary-header">
+                {% if user_role == 'admin' %}
+                    <i class="fas fa-tachometer-alt"></i> خلاصه وضعیت سیستم
+                {% elif user_role == 'primary_reviewer' %}
+                    <i class="fas fa-check-circle"></i> خلاصه وضعیت بررسی اولیه
+                {% elif user_role == 'secondary_reviewer' %}
+                    <i class="fas fa-tasks"></i> خلاصه وضعیت بررسی ثانویه
+                {% elif user_role == 'submitter' %}
+                    <i class="fas fa-warehouse"></i> خلاصه وضعیت انبار
+                {% endif %}
+            </div>
+            
+            <div id="dashboard-summary-content">
+                <p class="no-results"><i class="fas fa-spinner fa-pulse"></i> در حال بارگیری خلاصه وضعیت...</p>
+            </div>
+            
+            <div class="summary-stats" id="summary-stats-container">
+                <!-- Stats will be loaded here dynamically -->
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="notification-area" id="notifications-container">
+            <h2><i class="fas fa-bell"></i> اعلان‌های جدید</h2>
+            <div id="notification-list">
+                <p class="no-results"><i class="fas fa-spinner fa-pulse"></i> در حال بارگیری اعلان‌ها...</p>
+            </div>
+        </div>
+        
+        <div class="menu">
+            {% if user_role == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="menu-item"><i class="fas fa-tachometer-alt"></i> داشبورد مدیر</a>
+            {% elif user_role == 'primary_reviewer' %}
+                <a href="{{ url_for('reviewer_dashboard') }}" class="menu-item"><i class="fas fa-check-circle"></i> داشبورد بررسی کننده اولیه</a>
+            {% elif user_role == 'secondary_reviewer' %}
+                <a href="{{ url_for('reviewer_dashboard') }}" class="menu-item"><i class="fas fa-tasks"></i> داشبورد بررسی کننده ثانویه</a>
+            {% elif user_role == 'submitter' %}
+                <a href="{{ url_for('submitter_dashboard') }}" class="menu-item"><i class="fas fa-warehouse"></i> داشبورد انبار</a>
+            {% endif %}
+            
+            {% if user_role == 'admin' or user_role == 'secondary_reviewer' %}
+                <a href="{{ url_for('picture_and_table') }}" class="menu-item"><i class="fas fa-image"></i> تصویر و جدول</a>
+            {% endif %}
+            
+            {% if user_role == 'admin' or user_role == 'secondary_reviewer' %}
+                <a href="{{ url_for('picture_and_table_se') }}" class="menu-item"><i class="fas fa-vial"></i> آزمایش کلاهک</a>
+                <a href="{{ url_for('picture_and_table_de') }}" class="menu-item"><i class="fas fa-microscope"></i> آزمایش دستک</a>
+            {% endif %}
+            
+            <a href="{{ url_for('logout') }}" class="menu-item"><i class="fas fa-sign-out-alt"></i> خروج</a>
+        </div>
+        
+        <div class="footer">
+            تمامی حقوق محفوظ است © ۱۴۰۴
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchNotifications();
+            fetchDashboardSummary(); // New function to fetch dashboard summary
+            
+            // Set user role in localStorage for notifications
+            localStorage.setItem('userRole', '{{ user_role }}');
+        });
+
+        // Function to fetch dashboard summary
+        function fetchDashboardSummary() {
+            fetch('/dashboard_summary')
+                .then(response => response.json())
+                .then(data => {
+                    displayDashboardSummary(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching dashboard summary:', error);
+                    document.getElementById('dashboard-summary-content').innerHTML = 
+                        '<p class="no-results"><i class="fas fa-exclamation-circle"></i> خطا در بارگیری خلاصه وضعیت</p>';
+                });
+        }
+
+        // Function to display dashboard summary
+        function displayDashboardSummary(data) {
+            const contentContainer = document.getElementById('dashboard-summary-content');
+            const statsContainer = document.getElementById('summary-stats-container');
+            
+            if (!data || Object.keys(data).length === 0) {
+                contentContainer.innerHTML = '<p class="no-results"><i class="fas fa-info-circle"></i> اطلاعات خلاصه در دسترس نیست</p>';
+                return;
+            }
+            
+            // Clear previous content
+            contentContainer.innerHTML = '';
+            
+            // Display role-specific message
+            const userRole = "{{ user_role }}";
+            let welcomeMessage = '';
+            
+            if (userRole === 'admin') {
+                welcomeMessage = `<p>به داشبورد مدیریت خوش آمدید. ${data.pending_requests || 0} درخواست در انتظار بررسی و ${data.recent_activities || 0} فعالیت اخیر در سیستم وجود دارد.</p>`;
+            } else if (userRole === 'primary_reviewer') {
+                welcomeMessage = `<p>به داشبورد بررسی کننده اولیه خوش آمدید. ${data.pending_reviews || 0} مورد در انتظار بررسی شما وجود دارد.</p>`;
+            } else if (userRole === 'secondary_reviewer') {
+                welcomeMessage = `<p>به داشبورد بررسی کننده ثانویه خوش آمدید. ${data.pending_secondary_reviews || 0} مورد در انتظار بررسی تکمیلی شما وجود دارد.</p>`;
+            } else if (userRole === 'submitter') {
+                welcomeMessage = `<p>به داشبورد انبار خوش آمدید. ${data.submitted_items || 0} مورد ارسال شده توسط شما و ${data.approved_items || 0} مورد تایید شده وجود دارد.</p>`;
+            }
+            
+            contentContainer.innerHTML = welcomeMessage;
+            
+            // Display stats cards
+            let statsHTML = '';
+            
+            // Create different stat cards based on user role
+            if (userRole === 'admin') {
+                statsHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <div class="stat-value">${data.total_items || 0}</div>
+                        <div class="stat-label">کل موارد</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-value">${data.active_users || 0}</div>
+                        <div class="stat-label">کاربران فعال</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value">${data.approved_items || 0}</div>
+                        <div class="stat-label">موارد تایید شده</div>
+                    </div>`;
+            } else if (userRole === 'primary_reviewer') {
+                statsHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="stat-value">${data.pending_reviews || 0}</div>
+                        <div class="stat-label">در انتظار بررسی</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value">${data.approved_items || 0}</div>
+                        <div class="stat-label">تایید شده</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-value">${data.rejected_items || 0}</div>
+                        <div class="stat-label">رد شده</div>
+                    </div>`;
+            } else if (userRole === 'secondary_reviewer') {
+                statsHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="stat-value">${data.pending_secondary_reviews || 0}</div>
+                        <div class="stat-label">در انتظار بررسی تکمیلی</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-clipboard-check"></i></div>
+                        <div class="stat-value">${data.completed_reviews || 0}</div>
+                        <div class="stat-label">بررسی‌های تکمیل شده</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-value">${data.weekly_completion_rate || 0}%</div>
+                        <div class="stat-label">نرخ تکمیل هفتگی</div>
+                    </div>`;
+            } else if (userRole === 'submitter') {
+                statsHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-paper-plane"></i></div>
+                        <div class="stat-value">${data.submitted_items || 0}</div>
+                        <div class="stat-label">موارد ارسال شده</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value">${data.approved_items || 0}</div>
+                        <div class="stat-label">موارد تایید شده</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="stat-value">${data.pending_items || 0}</div>
+                        <div class="stat-label">در انتظار بررسی</div>
+                    </div>`;
+            }
+            
+            statsContainer.innerHTML = statsHTML;
+        }
+
+        function fetchNotifications() {
+            fetch('/notifications')
+                .then(response => response.json())
+                .then(data => {
+                    displayNotifications(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching notifications:', error);
+                    document.getElementById('notification-list').innerHTML = 
+                        '<p class="no-results"><i class="fas fa-exclamation-circle"></i> خطا در بارگیری اعلان‌ها</p>';
+                });
+        }
+
+        function displayNotifications(notifications) {
+            const container = document.getElementById('notification-list');
+            
+            // Get the user role for use in storage key
+            const userRole = localStorage.getItem('userRole') || '{{ user_role }}';
+            
+            // Use role-specific storage key
+            const storageKey = `readNotifications_${userRole}`;
+            const readNotificationsStorage = localStorage.getItem(storageKey);
+            const readNotifications = readNotificationsStorage ? JSON.parse(readNotificationsStorage) : [];
+            
+            // Filter out notifications that are marked as read or stored in localStorage for this role
+            const unreadNotifications = notifications.filter(notification => 
+                !notification.read && !readNotifications.includes(notification.id));
+            
+            if (unreadNotifications.length === 0) {
+                container.innerHTML = '<p class="no-results"><i class="fas fa-check-circle"></i> شما هیچ اعلان جدیدی ندارید</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            unreadNotifications.forEach(notification => {
+                html += `
+                    <div class="notification-item unread" id="notification-${notification.id}">
+                        <div class="notification-date"><i class="far fa-clock"></i> ${new Date(notification.timestamp * 1000).toLocaleString('fa-IR')}</div>
+                        <div class="notification-message">${notification.message}</div>
+                        <button class="notification-button" onclick="markNotificationRead('${notification.id}')"><i class="fas fa-check"></i> علامت خوانده شده</button>
+                    </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function markNotificationRead(notificationId) {
+            fetch(`/notifications/mark_read/${notificationId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Remove the notification from the UI
+                    const notification = document.getElementById(`notification-${notificationId}`);
+                    if (notification) {
+                        notification.remove();
+                    }
+                    
+                    // Store the notification ID in role-specific localStorage
+                    const userRole = localStorage.getItem('userRole') || '{{ user_role }}';
+                    const storageKey = `readNotifications_${userRole}`;
+                    const readNotificationsStorage = localStorage.getItem(storageKey);
+                    let readNotifications = readNotificationsStorage ? JSON.parse(readNotificationsStorage) : [];
+                    readNotifications.push(notificationId);
+                    localStorage.setItem(storageKey, JSON.stringify(readNotifications));
+                    
+                    // Check if there are no more notifications
+                    const container = document.getElementById('notification-list');
+                    if (container.children.length === 0) {
+                        container.innerHTML = '<p class="no-results"><i class="fas fa-check-circle"></i> شما هیچ اعلان جدیدی ندارید</p>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error marking notification as read:', error);
+            });
+        }
+    </script>
+</body>
+</html>
