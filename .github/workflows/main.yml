@@ -2,7 +2,7 @@ name: Deploy Flask App on Asiatek
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   deploy:
