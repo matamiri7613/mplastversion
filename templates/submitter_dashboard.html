@@ -377,6 +377,39 @@
             margin-right: 5px;
             display: inline-block;
         }
+        
+        /* Product category styles */
+        .product-category-group {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .product-category-header {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .product-category-options {
+            background-color: white;
+        }
+        .product-category-options option {
+            padding: 8px 12px;
+            color: #555;
+        }
+        
+        /* Enhanced select styling */
+        select#A {
+            background-color: white;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: left 8px center;
+            background-repeat: no-repeat;
+            background-size: 16px 16px;
+            padding-left: 40px;
+        }
     </style>
 </head>
 <body>
@@ -408,18 +441,40 @@
                             <label for="A">نوع محصول را انتخاب نمایید:</label>
                             <select id="A" name="A" required>
                                 <option value="" disabled selected>انتخاب نوع محصول</option>
-                                <option value="کلاهک 90">کلاهک 90</option>
-                                <option value="کلاهک 140">کلاهک 140</option>
-                                <option value="کلاهک 180">کلاهک 180</option>
-                                <option value="کلاهک 210">کلاهک 210</option>
-                                <option value="دستک 140">دستک 140</option>
-                                <option value="دستک 180">دستک 180</option>
-                                <option value="اشپیل 16">اشپیل 16</option>
-                                <option value="اشپیل 20">اشپیل 20</option>
-                                <option value="دیسک 80">دیسک 80</option>
-                                <option value="دیسک 120">دیسک 120</option>
-                                <option value="دیسک 160">دیسک 160</option>
-                                <option value="دیسک 210">دیسک 210</option>
+                                
+                                <!-- کلاهک Products -->
+                                <optgroup label="محصولات کلاهک">
+                                    <option value="کلاهک 90">کلاهک 90</option>
+                                    <option value="کلاهک 140">کلاهک 140</option>
+                                    <option value="کلاهک 180">کلاهک 180</option>
+                                    <option value="کلاهک 210">کلاهک 210</option>
+                                </optgroup>
+                                
+                                <!-- دستک Products -->
+                                <optgroup label="محصولات دستک">
+                                    <option value="دستک 140">دستک 140</option>
+                                    <option value="دستک 180">دستک 180</option>
+                                </optgroup>
+                                
+                                <!-- اشپیل Products -->
+                                <optgroup label="محصولات اشپیل">
+                                    <option value="اشپیل 16">اشپیل 16</option>
+                                    <option value="اشپیل 20">اشپیل 20</option>
+                                </optgroup>
+                                
+                                <!-- دیسک Products -->
+                                <optgroup label="محصولات دیسک">
+                                    <option value="دیسک 80">دیسک 80</option>
+                                    <option value="دیسک 120">دیسک 120</option>
+                                    <option value="دیسک 160">دیسک 160</option>
+                                    <option value="دیسک 210">دیسک 210</option>
+                                </optgroup>
+                                
+                                <!-- New Product Categories -->
+                                <optgroup label="سایر محصولات">
+                                    <option value="جعبه چوبی">جعبه چوبی</option>
+                                    <option value="سیمان/گروت">سیمان/گروت</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="form-group">
