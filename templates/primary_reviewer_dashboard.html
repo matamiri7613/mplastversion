@@ -959,6 +959,56 @@
                                 </div>`;
                         }
                         
+                        // Show دیسک specific test results
+                        if (productCategory === 'دیسک') {
+                            // Visual test results
+                            if (submission.secondary_reviewer_data.visual_test && submission.secondary_reviewer_data.visual_test.length > 0) {
+                                html += `
+                                    <div class="required-test-section">
+                                        <div class="required-test-title">نتایج تست بصری</div>
+                                        <div class="table-container">
+                                            <table class="measurement-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>شماره نمونه</th>
+                                                        <th>نتیجه بصری</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                                
+                                for (let i = 0; i < submission.secondary_reviewer_data.visual_test.length; i++) {
+                                    const visualResult = submission.secondary_reviewer_data.visual_test[i];
+                                    const resultText = visualResult.result === 'good' ? 'خوب' : 'بد';
+                                    const resultClass = visualResult.result === 'good' ? 'test-result-passed' : 'test-result-failed';
+                                    
+                                    html += `<tr>
+                                        <td>${visualResult.sample}</td>
+                                        <td class="${resultClass}">${resultText}</td>
+                                    </tr>`;
+                                }
+                                
+                                html += `
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>`;
+                            }
+                            
+                            // Glaze and Permeate test results
+                            if (submission.secondary_reviewer_data.glaze_test || submission.secondary_reviewer_data.permeate_test) {
+                                html += `
+                                    <div class="required-test-section">
+                                        <div class="required-test-title">تست های تکمیلی دیسک</div>
+                                        <div class="data-display">
+                                            <div class="data-section">
+                                                <p><span class="data-label">تست لعاب:</span> <span class="data-value">${submission.secondary_reviewer_data.glaze_test || 'ثبت نشده'}</span></p>
+                                                <p><span class="data-label">تست نفوذپذیری:</span> <span class="data-value">${submission.secondary_reviewer_data.permeate_test || 'ثبت نشده'}</span></p>
+                                            </div>
+                                        </div>
+                                    </div>`;
+                            }
+                        }
+                        
                         // Template report results with special styling for required products
                         if (submission.secondary_reviewer_data.template_report && submission.secondary_reviewer_data.template_report.length > 0) {
                             html += `
@@ -1358,6 +1408,13 @@
                         }
                         
                         html += `</div>`;
+                    }
+                    
+                    // Show special requirements for دیسک products
+                    if (productCategory === 'دیسک') {
+                        html += `<div class="required-test-section">
+                            <div class="attention-message">توجه: تست بصری، تست لعاب و تست نفوذپذیری برای محصول ${productType} الزامی است!</div>
+                        </div>`;
                     }
                     
                     html += `
@@ -2017,6 +2074,50 @@
                                 </tbody>
                             </table>
                         </div>`;
+                    }
+                    
+                    // Add دیسک specific test results to PDF
+                    if (productCategory === 'دیسک') {
+                        // Visual test results
+                        if (secondaryData.visual_test && secondaryData.visual_test.length > 0) {
+                            htmlContent += `
+                            <div class="test-section">
+                                <div class="test-title">نتایج تست بصری</div>
+                                <table class="measurement-table">
+                                    <thead>
+                                        <tr>
+                                            <th>شماره نمونه</th>
+                                            <th>نتیجه بصری</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                            
+                            for (let i = 0; i < secondaryData.visual_test.length; i++) {
+                                const visualResult = secondaryData.visual_test[i];
+                                const resultText = visualResult.result === 'good' ? 'خوب' : 'بد';
+                                const resultClass = visualResult.result === 'good' ? 'test-result-passed' : 'test-result-failed';
+                                
+                                htmlContent += `<tr>
+                                    <td>${visualResult.sample}</td>
+                                    <td class="${resultClass}">${resultText}</td>
+                                </tr>`;
+                            }
+                            
+                            htmlContent += `
+                                    </tbody>
+                                </table>
+                            </div>`;
+                        }
+                        
+                        // Glaze and Permeate test results
+                        if (secondaryData.glaze_test || secondaryData.permeate_test) {
+                            htmlContent += `
+                            <div class="test-section">
+                                <div class="test-title">تست های تکمیلی دیسک</div>
+                                <div class="item"><span class="label">تست لعاب:</span> ${secondaryData.glaze_test || 'ثبت نشده'}</div>
+                                <div class="item"><span class="label">تست نفوذپذیری:</span> ${secondaryData.permeate_test || 'ثبت نشده'}</div>
+                            </div>`;
+                        }
                     }
                     
                     // Add Template Report Results if available
