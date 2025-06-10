@@ -467,6 +467,8 @@
             'دیسک 120': 'دیسک',
             'دیسک 160': 'دیسک',
             'دیسک 210': 'دیسک',
+            'جعبه چوبی': 'جعبه چوبی',
+            'سیمان/گروت': 'سیمان/گروت'
         };
         
         // Define products that require galvanized test
@@ -479,7 +481,7 @@
             'دستک 180'
         ];
         
-        // Define products that require template report
+        // Define products that require template report (4 columns)
         const templateReportRequired = [
             'کلاهک 90',
             'کلاهک 140',
@@ -487,6 +489,12 @@
             'کلاهک 210',
             'دستک 140',
             'دستک 180'
+        ];
+        
+        // Define products that require 3-column template report
+        const templateReportRequired3Col = [
+            'جعبه چوبی',
+            'سیمان/گروت'
         ];
         
         // Define products that need to show standard diagram
@@ -505,6 +513,25 @@
         'دیسک 160',
         'دیسک 210'
     ];
+
+        // Function to determine if product requires template report and how many columns
+        function getTemplateReportInfo(productType) {
+            if (templateReportRequired.includes(productType)) {
+                return { required: true, columns: 4 };
+            } else if (templateReportRequired3Col.includes(productType)) {
+                return { required: true, columns: 3 };
+            }
+            return { required: false, columns: 0 };
+        }
+
+        // Function to generate template report table headers based on column count
+        function generateTemplateReportHeaders(columns) {
+            if (columns === 3) {
+                return ['شماره نمونه', 'پارامتر 1', 'پارامتر 2', 'پارامتر 3'];
+            } else {
+                return ['شماره نمونه', 'قالب 1', 'قالب 2', 'قالب 3', 'قالب 4'];
+            }
+        }
 
         function fetchSubmissions() {
             fetch('/reviewer/review_submissions')
@@ -541,13 +568,15 @@
                 const productCategory = productTypeCategories[productType] || productType;
                 // Check if this product requires galvanized test
                 const requiresGalvanizedTest = galvanizedTestRequired.includes(productType);
-                // Check if this product requires template report
-                const requiresTemplateReport = templateReportRequired.includes(productType);
+                // Check template report requirements
+                const templateInfo = getTemplateReportInfo(productType);
+                const requiresTemplateReport = templateInfo.required;
+                const templateColumns = templateInfo.columns;
                 // Check if this product should show standard diagram
                 const shouldShowDiagram = showStandardDiagram.includes(productType);
                 
                 html += `
-                    <div class="submission-item" id="submission-${submission.id}" data-product-type="${productType}" data-requires-galvanized="${requiresGalvanizedTest}" data-requires-template="${requiresTemplateReport}">
+                    <div class="submission-item" id="submission-${submission.id}" data-product-type="${productType}" data-requires-galvanized="${requiresGalvanizedTest}" data-requires-template="${requiresTemplateReport}" data-template-columns="${templateColumns}">
                         <div class="submission-header">
                             <div>
                                 <strong>ارسال کننده:</strong> ${submission.submitter} 
@@ -720,94 +749,141 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </div>`;
                         
-                        <!-- Template Report Section with special styling for required products -->
-                        ${requiresTemplateReport ? '<div class="required-test-section">' : ''}
-                        <div class="${requiresTemplateReport ? 'required-test-title' : 'section-title'}">گزارش شابلون</div>
-                        ${requiresTemplateReport ? '<div class="attention-message">توجه: گزارش شابلون برای محصول ' + productType + ' الزامی است!</div>' : ''}
-                        <div class="table-container">
-                            <table class="measurement-table" id="template-report-${submission.id}">
-                                <thead>
-                                    <tr>
-                                        <th>شماره نمونه</th>
-                                        <th>قالب 1</th>
-                                        <th>قالب 2</th>
-                                        <th>قالب 3</th>
-                                        <th>قالب 4</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Array(10).fill().map((_, rowIndex) => `
-                                        <tr>
-                                            <td>${rowIndex + 1}</td>
-                                            ${Array(4).fill().map((_, colIndex) => {
-                                                const colIndex1 = colIndex + 1; // 1, 2, 3, 4
-                                                const selectId = `templ-${submission.id}-${rowIndex}-${colIndex1}`;
-                                                const requiredAttr = requiresTemplateReport && rowIndex < 3 && colIndex < 3 ? 'required' : '';
-                                                
-                                                return `<td>
-                                                    <select id="${selectId}" class="data-input template-select" data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" data-required="${requiresTemplateReport}" ${requiredAttr} style="width: 70px;">
-                                                        <option value="">انتخاب</option>
-                                                        <option value="okay">مناسب</option>
-                                                        <option value="not-okay">نامناسب</option>
-                                                    </select>
-                                                </td>`;
-                                            }).join('')}
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        ${requiresTemplateReport ? '</div>' : ''}
-                        
-                        <!-- Section for galvanized test - apply special styling for required tests -->
-                        <div class="required-test-section">
-                            <div class="required-test-title">تست گالوانیزه (هر نمونه باید بیشتر از 80 باشد و میانگین بیشتر از 100)</div>
-                            ${requiresGalvanizedTest ? `
-                            <div class="attention-message">
-                                توجه: تست گالوانیزه برای محصول ${productType} الزامی است!
-                            </div>` : ''}
-                            <div class="table-container">
-                                <table class="measurement-table" id="galvanized-test-${submission.id}">
-                                    <thead>
-                                        <tr>
-                                            <th>شماره نمونه</th>
-                                            <th>تست 1</th>
-                                            <th>تست 2</th>
-                                            <th>تست 3</th>
-                                            <th>تست 4</th>
-                                            <th>تست 5</th>
-                                            <th>میانگین</th>
-                                            <th>نتیجه</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${Array(10).fill().map((_, rowIndex) => `
+                        // Add دیسک specific tests
+                        if (productCategory === 'دیسک') {
+                            html += `
+                            <div class="required-test-section">
+                                <div class="required-test-title">تست بصری</div>
+                                <div class="table-container">
+                                    <table class="measurement-table" id="visual-test-${submission.id}">
+                                        <thead>
                                             <tr>
-                                                <td>${rowIndex + 1}</td>
-                                                ${Array(5).fill().map((_, colIndex) => {
-                                                    const colIndex1 = colIndex + 1; // 1, 2, 3, 4, 5
-                                                    const inputId = `galv-${submission.id}-${rowIndex}-${colIndex1}`;
-                                                    const requiredAttr = requiresGalvanizedTest && rowIndex < 3 && colIndex < 3 ? 'required' : '';
-                                                    
-                                                    return `<td>
-                                                        <input type="number" min="0" id="${inputId}" class="data-input galvanized-input" 
-                                                            data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
-                                                            data-required="${requiresGalvanizedTest}" ${requiredAttr} style="width: 50px;">
-                                                    </td>`;
-                                                }).join('')}
-                                                <td id="galv-average-${submission.id}-${rowIndex}" class="highlight-average">-</td>
-                                                <td id="galv-result-${submission.id}-${rowIndex}">-</td>
+                                                <th>شماره نمونه</th>
+                                                <th>نتیجه بصری</th>
                                             </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                                <div class="galv-summary" id="galv-summary-${submission.id}">
-                                    میانگین: - | نتیجه کلی: -
+                                        </thead>
+                                        <tbody>
+                                            ${Array(10).fill().map((_, rowIndex) => `
+                                                <tr>
+                                                    <td>${rowIndex + 1}</td>
+                                                    <td>
+                                                        <select id="visual-${submission.id}-${rowIndex}" class="data-input visual-select" data-submissionid="${submission.id}" data-row="${rowIndex}" style="width: 100px;">
+                                                            <option value="">انتخاب</option>
+                                                            <option value="good">خوب</option>
+                                                            <option value="bad">بد</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                        </div>`;
+                            
+                            <div class="required-test-section">
+                                <div class="required-test-title">تست های تکمیلی</div>
+                                <div class="data-row">
+                                    <div style="flex: 1;">
+                                        <label for="glaze-test-${submission.id}" style="display: block; margin-bottom: 5px; font-weight: bold;">تست لعاب:</label>
+                                        <textarea id="glaze-test-${submission.id}" class="data-input" placeholder="نتیجه تست لعاب" rows="3" required></textarea>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label for="permeate-test-${submission.id}" style="display: block; margin-bottom: 5px; font-weight: bold;">تست نفوذپذیری:</label>
+                                        <textarea id="permeate-test-${submission.id}" class="data-input" placeholder="نتیجه تست نفوذپذیری" rows="3" required></textarea>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
+                        
+                        // ONLY show Template Report if it's actually required for this specific product type
+                        if (requiresTemplateReport) {
+                            html += `
+                            <div class="required-test-section">
+                                <div class="required-test-title">گزارش شابلون</div>
+                                <div class="attention-message">توجه: گزارش شابلون برای محصول ${productType} الزامی است!</div>
+                                <div class="table-container">
+                                    <table class="measurement-table" id="template-report-${submission.id}">
+                                        <thead>
+                                            <tr>
+                                                ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Array(10).fill().map((_, rowIndex) => `
+                                                <tr>
+                                                    <td>${rowIndex + 1}</td>
+                                                    ${Array(templateColumns).fill().map((_, colIndex) => {
+                                                        const colIndex1 = colIndex + 1; // 1, 2, 3, (4)
+                                                        const selectId = `templ-${submission.id}-${rowIndex}-${colIndex1}`;
+                                                        const requiredAttr = rowIndex < 3 && colIndex < Math.min(3, templateColumns) ? 'required' : '';
+                                                        
+                                                        return `<td>
+                                                            <select id="${selectId}" class="data-input template-select" data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" data-required="${requiresTemplateReport}" data-columns="${templateColumns}" ${requiredAttr} style="width: 70px;">
+                                                                <option value="">انتخاب</option>
+                                                                <option value="okay">مناسب</option>
+                                                                <option value="not-okay">نامناسب</option>
+                                                            </select>
+                                                        </td>`;
+                                                    }).join('')}
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>`;
+                        }
+                        
+                        // ONLY show Galvanized Test if it's actually required for this specific product type
+                        if (requiresGalvanizedTest) {
+                            html += `
+                            <div class="required-test-section">
+                                <div class="required-test-title">تست گالوانیزه (هر نمونه باید بیشتر از 80 باشد و میانگین بیشتر از 100)</div>
+                                <div class="attention-message">
+                                    توجه: تست گالوانیزه برای محصول ${productType} الزامی است!
+                                </div>
+                                <div class="table-container">
+                                    <table class="measurement-table" id="galvanized-test-${submission.id}">
+                                        <thead>
+                                            <tr>
+                                                <th>شماره نمونه</th>
+                                                <th>تست 1</th>
+                                                <th>تست 2</th>
+                                                <th>تست 3</th>
+                                                <th>تست 4</th>
+                                                <th>تست 5</th>
+                                                <th>میانگین</th>
+                                                <th>نتیجه</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Array(10).fill().map((_, rowIndex) => `
+                                                <tr>
+                                                    <td>${rowIndex + 1}</td>
+                                                    ${Array(5).fill().map((_, colIndex) => {
+                                                        const colIndex1 = colIndex + 1; // 1, 2, 3, 4, 5
+                                                        const inputId = `galv-${submission.id}-${rowIndex}-${colIndex1}`;
+                                                        const requiredAttr = rowIndex < 3 && colIndex < 3 ? 'required' : '';
+                                                        
+                                                        return `<td>
+                                                            <input type="number" min="0" id="${inputId}" class="data-input galvanized-input" 
+                                                                data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
+                                                                data-required="${requiresGalvanizedTest}" ${requiredAttr} style="width: 50px;">
+                                                        </td>`;
+                                                    }).join('')}
+                                                    <td id="galv-average-${submission.id}-${rowIndex}" class="highlight-average">-</td>
+                                                    <td id="galv-result-${submission.id}-${rowIndex}">-</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                    <div class="galv-summary" id="galv-summary-${submission.id}">
+                                        میانگین: - | نتیجه کلی: -
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
                     } else if (productCategory === 'دستک' || productCategory === 'اشپیل') {
                         // Get the specific ranges for this product type
                         const standardRanges = productStandardRanges[productType] || productStandardRanges['دستک'];
@@ -930,104 +1006,147 @@
                             </div>
                         </div>`;
                         
-                        // Add Template Report and Galvanized Test for special دستک products
-                        if (productCategory === 'دستک' || productCategory === 'اشپیل') {
-                            // Add Template Report if required
-                            if (requiresTemplateReport) {
-                                html += `
-                                <div class="required-test-section">
-                                    <div class="required-test-title">گزارش شابلون</div>
-                                    <div class="attention-message">
-                                        توجه: گزارش شابلون برای محصول ${productType} الزامی است!
-                                    </div>
-                                    <div class="table-container">
-                                        <table class="measurement-table" id="template-report-${submission.id}">
-                                            <thead>
+                        // Add Template Report and Galvanized Test for special دستک products ONLY if required
+                        if (requiresTemplateReport) {
+                            html += `
+                            <div class="required-test-section">
+                                <div class="required-test-title">گزارش شابلون</div>
+                                <div class="attention-message">
+                                    توجه: گزارش شابلون برای محصول ${productType} الزامی است!
+                                </div>
+                                <div class="table-container">
+                                    <table class="measurement-table" id="template-report-${submission.id}">
+                                        <thead>
+                                            <tr>
+                                                ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Array(10).fill().map((_, rowIndex) => `
                                                 <tr>
-                                                    <th>شماره نمونه</th>
-                                                    <th>قالب 1</th>
-                                                    <th>قالب 2</th>
-                                                    <th>قالب 3</th>
-                                                    <th>قالب 4</th>
+                                                    <td>${rowIndex + 1}</td>
+                                                    ${Array(templateColumns).fill().map((_, colIndex) => {
+                                                        const colIndex1 = colIndex + 1; // 1, 2, 3, (4)
+                                                        const selectId = `templ-${submission.id}-${rowIndex}-${colIndex1}`;
+                                                        const requiredAttr = rowIndex < 3 && colIndex < Math.min(3, templateColumns) ? 'required' : '';
+                                                        
+                                                        return `<td>
+                                                            <select id="${selectId}" class="data-input template-select" 
+                                                                data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
+                                                                data-required="true" data-columns="${templateColumns}" ${requiredAttr} style="width: 70px;">
+                                                                <option value="">انتخاب</option>
+                                                                <option value="okay">مناسب</option>
+                                                                <option value="not-okay">نامناسب</option>
+                                                            </select>
+                                                        </td>`;
+                                                    }).join('')}
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${Array(10).fill().map((_, rowIndex) => `
-                                                    <tr>
-                                                        <td>${rowIndex + 1}</td>
-                                                        ${Array(4).fill().map((_, colIndex) => {
-                                                            const colIndex1 = colIndex + 1; // 1, 2, 3, 4
-                                                            const selectId = `templ-${submission.id}-${rowIndex}-${colIndex1}`;
-                                                            const requiredAttr = rowIndex < 3 && colIndex < 3 ? 'required' : '';
-                                                            
-                                                            return `<td>
-                                                                <select id="${selectId}" class="data-input template-select" 
-                                                                    data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
-                                                                    data-required="true" ${requiredAttr} style="width: 70px;">
-                                                                    <option value="">انتخاب</option>
-                                                                    <option value="okay">مناسب</option>
-                                                                    <option value="not-okay">نامناسب</option>
-                                                                </select>
-                                                            </td>`;
-                                                        }).join('')}
-                                                    </tr>
-                                                `).join('')}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>`;
-                            }
-                            
-                            // Add Galvanized Test if required
-                            if (requiresGalvanizedTest) {
-                                html += `
-                                <div class="required-test-section">
-                                    <div class="required-test-title">تست گالوانیزه (هر نمونه باید بیشتر از 80 باشد و میانگین بیشتر از 100)</div>
-                                    <div class="attention-message">
-                                        توجه: تست گالوانیزه برای محصول ${productType} الزامی است!
-                                    </div>
-                                    <div class="table-container">
-                                        <table class="measurement-table" id="galvanized-test-${submission.id}">
-                                            <thead>
-                                                <tr>
-                                                    <th>شماره نمونه</th>
-                                                    <th>تست 1</th>
-                                                    <th>تست 2</th>
-                                                    <th>تست 3</th>
-                                                    <th>تست 4</th>
-                                                    <th>تست 5</th>
-                                                    <th>میانگین</th>
-                                                    <th>نتیجه</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${Array(10).fill().map((_, rowIndex) => `
-                                                    <tr>
-                                                        <td>${rowIndex + 1}</td>
-                                                        ${Array(5).fill().map((_, colIndex) => {
-                                                            const colIndex1 = colIndex + 1; // 1, 2, 3, 4, 5
-                                                            const inputId = `galv-${submission.id}-${rowIndex}-${colIndex1}`;
-                                                            const requiredAttr = rowIndex < 3 && colIndex < 3 ? 'required' : '';
-                                                            
-                                                            return `<td>
-                                                                <input type="number" min="0" id="${inputId}" class="data-input galvanized-input" 
-                                                                    data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
-                                                                    data-required="true" ${requiredAttr} style="width: 50px;">
-                                                            </td>`;
-                                                        }).join('')}
-                                                        <td id="galv-average-${submission.id}-${rowIndex}" class="highlight-average">-</td>
-                                                        <td id="galv-result-${submission.id}-${rowIndex}">-</td>
-                                                    </tr>
-                                                `).join('')}
-                                            </tbody>
-                                        </table>
-                                        <div class="galv-summary" id="galv-summary-${submission.id}">
-                                            میانگین: - | نتیجه کلی: -
-                                        </div>
-                                    </div>
-                                </div>`;
-                            }
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>`;
                         }
+                        
+                        // Add Galvanized Test ONLY if required
+                        if (requiresGalvanizedTest) {
+                            html += `
+                            <div class="required-test-section">
+                                <div class="required-test-title">تست گالوانیزه (هر نمونه باید بیشتر از 80 باشد و میانگین بیشتر از 100)</div>
+                                <div class="attention-message">
+                                    توجه: تست گالوانیزه برای محصول ${productType} الزامی است!
+                                </div>
+                                <div class="table-container">
+                                    <table class="measurement-table" id="galvanized-test-${submission.id}">
+                                        <thead>
+                                            <tr>
+                                                <th>شماره نمونه</th>
+                                                <th>تست 1</th>
+                                                <th>تست 2</th>
+                                                <th>تست 3</th>
+                                                <th>تست 4</th>
+                                                <th>تست 5</th>
+                                                <th>میانگین</th>
+                                                <th>نتیجه</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Array(10).fill().map((_, rowIndex) => `
+                                                <tr>
+                                                    <td>${rowIndex + 1}</td>
+                                                    ${Array(5).fill().map((_, colIndex) => {
+                                                        const colIndex1 = colIndex + 1; // 1, 2, 3, 4, 5
+                                                        const inputId = `galv-${submission.id}-${rowIndex}-${colIndex1}`;
+                                                        const requiredAttr = rowIndex < 3 && colIndex < 3 ? 'required' : '';
+                                                        
+                                                        return `<td>
+                                                            <input type="number" min="0" id="${inputId}" class="data-input galvanized-input" 
+                                                                data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
+                                                                data-required="true" ${requiredAttr} style="width: 50px;">
+                                                        </td>`;
+                                                    }).join('')}
+                                                    <td id="galv-average-${submission.id}-${rowIndex}" class="highlight-average">-</td>
+                                                    <td id="galv-result-${submission.id}-${rowIndex}">-</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                    <div class="galv-summary" id="galv-summary-${submission.id}">
+                                        میانگین: - | نتیجه کلی: -
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
+                    } else if (productCategory === 'جعبه چوبی' || productCategory === 'سیمان/گروت') {
+                        // Handle new product categories with 3-column template reports
+                        html += `
+                        <div class="section-title">اطلاعات کلی</div>
+                        <div class="data-row">
+                            <input type="text" id="quality-check-${submission.id}" class="data-input" placeholder="نتیجه بررسی کیفیت">
+                            <input type="text" id="packaging-status-${submission.id}" class="data-input" placeholder="وضعیت بسته بندی">
+                        </div>
+                        <div class="data-row">
+                            <input type="number" id="arrival-number-${submission.id}" class="data-input" placeholder="شماره ورود">
+                            <input type="string" id="storage-code-${submission.id}" class="data-input" placeholder="کد انبار">
+                        </div>
+                        
+                        <div class="required-test-section">
+                            <div class="required-test-title">گزارش تست محصول</div>
+                            <div class="attention-message">
+                                توجه: تست محصول برای ${productType} الزامی است!
+                            </div>
+                            <div class="table-container">
+                                <table class="measurement-table" id="template-report-${submission.id}">
+                                    <thead>
+                                        <tr>
+                                            ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Array(10).fill().map((_, rowIndex) => `
+                                            <tr>
+                                                <td>${rowIndex + 1}</td>
+                                                ${Array(templateColumns).fill().map((_, colIndex) => {
+                                                    const colIndex1 = colIndex + 1; // 1, 2, 3
+                                                    const selectId = `templ-${submission.id}-${rowIndex}-${colIndex1}`;
+                                                    const requiredAttr = rowIndex < 3 && colIndex < 3 ? 'required' : '';
+                                                    
+                                                    return `<td>
+                                                        <select id="${selectId}" class="data-input template-select" 
+                                                            data-submissionid="${submission.id}" data-row="${rowIndex}" data-col="${colIndex1}" 
+                                                            data-required="true" data-columns="${templateColumns}" ${requiredAttr} style="width: 70px;">
+                                                            <option value="">انتخاب</option>
+                                                            <option value="okay">مناسب</option>
+                                                            <option value="not-okay">نامناسب</option>
+                                                        </select>
+                                                    </td>`;
+                                                }).join('')}
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>`;
                     } else {
                         // Default - show general fields for other products
                         html += `
@@ -1221,9 +1340,49 @@
                             html += `</tbody></table></div>`;
                         }
                         
-                        if (submission.secondary_reviewer_data.template_report) {
-                            const templateSectionClass = requiresTemplateReport ? 'required-test-section' : '';
-                            const templateTitleClass = requiresTemplateReport ? 'required-test-title' : 'section-title';
+                        // Show دیسک specific test results
+                        if (productCategory === 'دیسک') {
+                            if (submission.secondary_reviewer_data.visual_test && submission.secondary_reviewer_data.visual_test.length > 0) {
+                                html += `<div class="section-title">نتایج تست بصری</div>
+                                    <div class="table-container">
+                                        <table class="measurement-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>شماره نمونه</th>
+                                                    <th>نتیجه بصری</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+                                
+                                for (let i = 0; i < submission.secondary_reviewer_data.visual_test.length; i++) {
+                                    const visualResult = submission.secondary_reviewer_data.visual_test[i];
+                                    const resultText = visualResult.result === 'good' ? 'خوب' : 'بد';
+                                    const resultClass = visualResult.result === 'good' ? 'test-result-passed' : 'test-result-failed';
+                                    
+                                    html += `<tr>
+                                        <td>${visualResult.sample}</td>
+                                        <td class="${resultClass}">${resultText}</td>
+                                    </tr>`;
+                                }
+                                
+                                html += `</tbody></table></div>`;
+                            }
+                            
+                            if (submission.secondary_reviewer_data.glaze_test || submission.secondary_reviewer_data.permeate_test) {
+                                html += `<div class="data-display">
+                                    <div class="data-section">
+                                        <h4>تست های تکمیلی</h4>
+                                        <p><span class="data-label">تست لعاب:</span> <span class="data-value">${submission.secondary_reviewer_data.glaze_test || 'ثبت نشده'}</span></p>
+                                        <p><span class="data-label">تست نفوذپذیری:</span> <span class="data-value">${submission.secondary_reviewer_data.permeate_test || 'ثبت نشده'}</span></p>
+                                    </div>
+                                </div>`;
+                            }
+                        }
+                        
+                        // ONLY show template report results if it was required and data exists
+                        if (requiresTemplateReport && submission.secondary_reviewer_data.template_report) {
+                            const templateSectionClass = 'required-test-section';
+                            const templateTitleClass = 'required-test-title';
                             
                             html += `<div class="${templateSectionClass}">
                                 <div class="${templateTitleClass}">نتایج گزارش شابلون</div>
@@ -1231,11 +1390,7 @@
                                     <table class="measurement-table">
                                         <thead>
                                             <tr>
-                                                <th>شماره نمونه</th>
-                                                <th>قالب 1</th>
-                                                <th>قالب 2</th>
-                                                <th>قالب 3</th>
-                                                <th>قالب 4</th>
+                                                ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
                                             </tr>
                                         </thead>
                                         <tbody>`;
@@ -1244,7 +1399,7 @@
                                 const row = submission.secondary_reviewer_data.template_report[i];
                                 html += `<tr><td>${i + 1}</td>`;
                                 
-                                for (let colIndex = 1; colIndex <= 4; colIndex++) {
+                                for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
                                     const colValue = row[colIndex] || '';
                                     const value = colValue === 'okay' ? 'مناسب' : 'نامناسب';
                                     const className = colValue === 'okay' ? 'test-result-passed' : 'test-result-failed';
@@ -1254,13 +1409,13 @@
                                 html += `</tr>`;
                             }
                             
-                            html += `</tbody></table></div>
-                            ${requiresTemplateReport ? '</div>' : ''}`;
+                            html += `</tbody></table></div></div>`;
                         }
                         
-                        if (submission.secondary_reviewer_data.galvanized_test) {
-                            const galvSectionClass = requiresGalvanizedTest ? 'required-test-section' : '';
-                            const galvTitleClass = requiresGalvanizedTest ? 'required-test-title' : 'section-title';
+                        // ONLY show galvanized test results if it was required and data exists
+                        if (requiresGalvanizedTest && submission.secondary_reviewer_data.galvanized_test) {
+                            const galvSectionClass = 'required-test-section';
+                            const galvTitleClass = 'required-test-title';
                             
                             html += `<div class="${galvSectionClass}">
                                 <div class="${galvTitleClass}">نتایج تست گالوانیزه</div>
@@ -1377,7 +1532,7 @@
                                     </tbody>
                                 </table>`;
                                 
-                                // Add standard diagram for specific products (unlikely but just in case)
+                                // Add standard diagram for specific products (if needed in display mode)
                                 if (shouldShowDiagram) {
                                 // Check if the product is اشپیل (Shpeil)
                                 if (productType.includes('اشپیل')) {
@@ -1468,7 +1623,7 @@
                             html += `</tbody></table></div>`;
                         }
                         
-                        // Show template report results if available and if this was a required product
+                        // Show template report results ONLY if available and if this was a required product
                         if (requiresTemplateReport && submission.secondary_reviewer_data.template_report) {
                             html += `<div class="required-test-section">
                                 <div class="required-test-title">نتایج گزارش شابلون</div>
@@ -1476,11 +1631,7 @@
                                     <table class="measurement-table">
                                         <thead>
                                             <tr>
-                                                <th>شماره نمونه</th>
-                                                <th>قالب 1</th>
-                                                <th>قالب 2</th>
-                                                <th>قالب 3</th>
-                                                <th>قالب 4</th>
+                                                ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
                                             </tr>
                                         </thead>
                                         <tbody>`;
@@ -1489,7 +1640,7 @@
                                 const row = submission.secondary_reviewer_data.template_report[i];
                                 html += `<tr><td>${i + 1}</td>`;
                                 
-                                for (let colIndex = 1; colIndex <= 4; colIndex++) {
+                                for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
                                     const colValue = row[colIndex] || '';
                                     const value = colValue === 'okay' ? 'مناسب' : 'نامناسب';
                                     const className = colValue === 'okay' ? 'test-result-passed' : 'test-result-failed';
@@ -1502,7 +1653,7 @@
                             html += `</tbody></table></div></div>`;
                         }
                         
-                        // Show galvanized test results if available and if this was a required product
+                        // Show galvanized test results ONLY if available and if this was a required product
                         if (requiresGalvanizedTest && submission.secondary_reviewer_data.galvanized_test) {
                             html += `<div class="required-test-section">
                                 <div class="required-test-title">نتایج تست گالوانیزه</div>
@@ -1582,6 +1733,47 @@
                                 </div>
                             </div>`;
                         }
+                    } else if (productCategory === 'جعبه چوبی' || productCategory === 'سیمان/گروت') {
+                        // Display data for new product categories
+                        html += `
+                            <div class="data-display">
+                                <div class="data-section">
+                                    <h4>اطلاعات کلی</h4>
+                                    <p><span class="data-label">نتیجه بررسی کیفیت:</span> <span class="data-value">${submission.secondary_reviewer_data.quality_check || 'ثبت نشده'}</span></p>
+                                    <p><span class="data-label">وضعیت بسته بندی:</span> <span class="data-value">${submission.secondary_reviewer_data.packaging_status || 'ثبت نشده'}</span></p>
+                                    <p><span class="data-label">شماره ورود:</span> <span class="data-value">${submission.secondary_reviewer_data.arrival_number || 'ثبت نشده'}</span></p>
+                                    <p><span class="data-label">کد انبار:</span> <span class="data-value">${submission.secondary_reviewer_data.storage_code || 'ثبت نشده'}</span></p>
+                                </div>
+                            </div>`;
+                        
+                        if (submission.secondary_reviewer_data.template_report) {
+                            html += `<div class="required-test-section">
+                                <div class="required-test-title">نتایج تست محصول</div>
+                                <div class="table-container">
+                                    <table class="measurement-table">
+                                        <thead>
+                                            <tr>
+                                                ${generateTemplateReportHeaders(templateColumns).map(header => `<th>${header}</th>`).join('')}
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                            
+                            for (let i = 0; i < submission.secondary_reviewer_data.template_report.length; i++) {
+                                const row = submission.secondary_reviewer_data.template_report[i];
+                                html += `<tr><td>${i + 1}</td>`;
+                                
+                                for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
+                                    const colValue = row[colIndex] || '';
+                                    const value = colValue === 'okay' ? 'مناسب' : 'نامناسب';
+                                    const className = colValue === 'okay' ? 'test-result-passed' : 'test-result-failed';
+                                    html += `<td class="${className}">${value}</td>`;
+                                }
+                                
+                                html += `</tr>`;
+                            }
+                            
+                            html += `</tbody></table></div></div>`;
+                        }
                     } else {
                         html += `
                             <div class="data-display">
@@ -1638,7 +1830,8 @@
                     const productType = submission.A;
                     const productCategory = productTypeCategories[productType] || productType;
                     const requiresGalvanizedTest = galvanizedTestRequired.includes(productType);
-                    const requiresTemplateReport = templateReportRequired.includes(productType);
+                    const templateInfo = getTemplateReportInfo(productType);
+                    const requiresTemplateReport = templateInfo.required;
                     
                     if (productCategory === 'کلاهک' || productCategory === 'دیسک' || 
                         (requiresGalvanizedTest && (productCategory === 'دستک' || productCategory === 'اشپیل'))) {
@@ -1679,6 +1872,26 @@
                                     parentCell.classList.remove('select-inappropriate');
                                     parentCell.classList.add('select-appropriate');
                                 } else if (this.value === 'not-okay') {
+                                    parentCell.classList.remove('select-appropriate');
+                                    parentCell.classList.add('select-inappropriate');
+                                } else {
+                                    parentCell.classList.remove('select-appropriate', 'select-inappropriate');
+                                }
+                            });
+                        });
+                    }
+                    
+                    // Add event listeners for visual test selects (دیسک products)
+                    if (productCategory === 'دیسک') {
+                        const visualSelects = document.querySelectorAll(`.visual-select[data-submissionid="${submission.id}"]`);
+                        visualSelects.forEach(select => {
+                            select.addEventListener('change', function() {
+                                // Apply instant color feedback
+                                const parentCell = this.parentElement;
+                                if (this.value === 'good') {
+                                    parentCell.classList.remove('select-inappropriate');
+                                    parentCell.classList.add('select-appropriate');
+                                } else if (this.value === 'bad') {
                                     parentCell.classList.remove('select-appropriate');
                                     parentCell.classList.add('select-inappropriate');
                                 } else {
@@ -1811,6 +2024,7 @@
             const productType = submissionItem.getAttribute('data-product-type');
             const requiresGalvanizedTest = submissionItem.getAttribute('data-requires-galvanized') === 'true';
             const requiresTemplateReport = submissionItem.getAttribute('data-requires-template') === 'true';
+            const templateColumns = parseInt(submissionItem.getAttribute('data-template-columns')) || 4;
             
             // Get the product category
             const productCategory = productTypeCategories[productType] || productType;
@@ -1886,6 +2100,40 @@
                     isValid = false;
                 }
                 
+                // Collect دیسک specific test data
+                let visualTest = [];
+                let glazeTest = '';
+                let permeateTest = '';
+                
+                if (productCategory === 'دیسک') {
+                    // Collect visual test data
+                    for (let rowIndex = 0; rowIndex < 10; rowIndex++) {
+                        const selectId = `visual-${id}-${rowIndex}`;
+                        const select = document.getElementById(selectId);
+                        
+                        if (select && select.value !== '') {
+                            visualTest.push({
+                                sample: rowIndex + 1,
+                                result: select.value
+                            });
+                        }
+                    }
+                    
+                    // Get glaze and permeate test results
+                    glazeTest = document.getElementById(`glaze-test-${id}`).value.trim();
+                    permeateTest = document.getElementById(`permeate-test-${id}`).value.trim();
+                    
+                    // Check required دیسک tests
+                    if (!glazeTest || !permeateTest) {
+                        isValid = false;
+                    }
+                    
+                    // Check if at least some visual test data is provided
+                    if (visualTest.length === 0) {
+                        isValid = false;
+                    }
+                }
+                
                 // Collect template report data
                 const templateReport = [];
                 let templateReportValid = !requiresTemplateReport; // Only fail validation if required and no data
@@ -1894,7 +2142,7 @@
                     const rowData = {};
                     let hasData = false;
                     
-                    for (let colIndex = 1; colIndex <= 4; colIndex++) {
+                    for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
                         const selectId = `templ-${id}-${rowIndex}-${colIndex}`;
                         const select = document.getElementById(selectId);
                         
@@ -2009,6 +2257,9 @@
                     storage_code: storageCode,
                     persian_date: persianDate,
                     dimensional_test: dimensionalTest,
+                    visual_test: productCategory === 'دیسک' ? visualTest : [],
+                    glaze_test: productCategory === 'دیسک' ? glazeTest : '',
+                    permeate_test: productCategory === 'دیسک' ? permeateTest : '',
                     template_report: templateReport,
                     galvanized_test: galvanizedTest,
                     quality_check: 'N/A',
@@ -2073,7 +2324,7 @@
                         const rowData = {};
                         let hasData = false;
                         
-                        for (let colIndex = 1; colIndex <= 4; colIndex++) {
+                        for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
                             const selectId = `templ-${id}-${rowIndex}-${colIndex}`;
                             const select = document.getElementById(selectId);
                             
@@ -2193,6 +2444,66 @@
                     dimensional_test: dimensionalTest,
                     template_report: requiresTemplateReport ? templateReport : [],
                     galvanized_test: requiresGalvanizedTest ? galvanizedTest : [],
+                    production_line: 'N/A',
+                    verification_code: 'N/A',
+                    comment: comment,
+                    lab_manager_checked: labManagerChecked,
+                    lab_supervisor_checked: labSupervisorChecked
+                };
+                
+            } else if (productCategory === 'جعبه چوبی' || productCategory === 'سیمان/گروت') {
+                // Handle new product categories with 3-column template reports
+                const qualityCheck = document.getElementById(`quality-check-${id}`).value.trim();
+                const packagingStatus = document.getElementById(`packaging-status-${id}`).value.trim();
+                const arrivalNumber = document.getElementById(`arrival-number-${id}`).value.trim();
+                const storageCode = document.getElementById(`storage-code-${id}`).value.trim();
+                
+                if (!qualityCheck || !packagingStatus || !arrivalNumber || !storageCode) {
+                    isValid = false;
+                }
+                
+                // Collect template report data (3 columns for these products)
+                const templateReport = [];
+                let templateReportValid = false;
+                
+                for (let rowIndex = 0; rowIndex < 10; rowIndex++) {
+                    const rowData = {};
+                    let hasData = false;
+                    
+                    for (let colIndex = 1; colIndex <= templateColumns; colIndex++) {
+                        const selectId = `templ-${id}-${rowIndex}-${colIndex}`;
+                        const select = document.getElementById(selectId);
+                        
+                        if (select && select.value !== '') {
+                            rowData[colIndex] = select.value;
+                            hasData = true;
+                        } else {
+                            rowData[colIndex] = '';
+                        }
+                    }
+                    
+                    if (hasData) {
+                        templateReport.push(rowData);
+                        templateReportValid = true;
+                    }
+                }
+                
+                // Template report is required for these product types
+                if (templateReport.length === 0) {
+                    isValid = false;
+                    templateReportValid = false;
+                    errorMessage.textContent = 'برای محصول ' + productType + ' تست محصول الزامی است';
+                    errorMessage.style.display = 'block';
+                }
+                
+                additionalData = {
+                    quality_check: qualityCheck,
+                    packaging_status: packagingStatus,
+                    arrival_number: arrivalNumber,
+                    storage_code: storageCode,
+                    template_report: templateReport,
+                    dimensional_test: [],
+                    galvanized_test: [],
                     production_line: 'N/A',
                     verification_code: 'N/A',
                     comment: comment,
