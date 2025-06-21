@@ -28,7 +28,7 @@ jobs:
       with:
         host: 79.127.85.198
         username: root
-        password: 133976beh
+        password: :J\5O?FStdyk,t
         script: |
           # Create directory if it doesn't exist
           mkdir -p /var/www/flask-app
@@ -92,7 +92,7 @@ jobs:
       with:
         host: 79.127.85.198
         username: root
-        password: 133976beh
+        password: :J\5O?FStdyk,t
         source: "*.py,templates/*,static/*,*.json"
         target: "/var/www/flask-app"
         strip_components: 0
@@ -102,7 +102,7 @@ jobs:
       with:
         host: 79.127.85.198
         username: root
-        password: 133976beh
+        password: :J\5O?FStdyk,t
         script: |
           systemctl restart flask-app
           echo "Deployment completed successfully!"
