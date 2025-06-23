@@ -1,4 +1,4 @@
-name: Deploy Flask App on Asiatek
+name: Deploy Flask App on Asiatek-1
 
 on:
   push:
