@@ -26,32 +26,47 @@ jobs:
     - name: Deploy to server
       uses: appleboy/ssh-action@master
       with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
+        host: '79.127.85.198'
+        username: 'root'
+        password: '133976beh'
         script: |
           # Create directory if it doesn't exist
-          mkdir -p /var/www/flask-app
+          mkdir -p /var/www/flask-app/{templates,static}
           
           # Create virtual environment if it doesn't exist
           if [ ! -d "/var/www/flask-app/venv" ]; then
             python3 -m venv /var/www/flask-app/venv
           fi
           
-          # Activate virtual environment and install dependencies
-          source /var/www/flask-app/venv/bin/activate
-          pip install flask gunicorn
+          # Install requirements
+          /var/www/flask-app/venv/bin/pip install --upgrade pip
+          /var/www/flask-app/venv/bin/pip install flask gunicorn
           
-          # Create a temporary file for comparing if requirements.txt exists
-          echo "flask\ngunicorn" > /tmp/default_requirements.txt
+          # Use existing requirements.txt or create default
           if [ ! -f "/var/www/flask-app/requirements.txt" ]; then
-            cp /tmp/default_requirements.txt /var/www/flask-app/requirements.txt
+            echo "flask\ngunicorn" > /var/www/flask-app/requirements.txt
           fi
-          
-          pip install -r /var/www/flask-app/requirements.txt
-          
-          # Create or update systemd service
-          cat > /tmp/flask-app.service << 'EOL'
+          /var/www/flask-app/venv/bin/pip install -r /var/www/flask-app/requirements.txt
+
+    - name: Copy application files
+      uses: appleboy/scp-action@master
+      with:
+        host: '79.127.85.198'
+        username: 'root'
+        password: '133976beh'
+        source: "*.py,templates/*,static/*,*.json"
+        target: "/var/www/flask-app"
+        strip_components: 0
+
+    - name: Configure and start services
+      uses: appleboy/ssh-action@master
+      with:
+        host: '79.127.85.198'
+        username: 'root'
+        password: '133976beh'
+        script: |
+          # Create systemd service
+          cat > /etc/systemd/system/flask-app.service << 'EOL'
           [Unit]
           Description=Flask App Service
           After=network.target
@@ -59,6 +74,7 @@ jobs:
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
+          Environment="PATH=/var/www/flask-app/venv/bin"
           ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000
           Restart=always
           
@@ -66,43 +82,25 @@ jobs:
           WantedBy=multi-user.target
           EOL
           
-          mv /tmp/flask-app.service /etc/systemd/system/flask-app.service
           systemctl daemon-reload
+          systemctl enable flask-app
+          systemctl restart flask-app
           
           # Configure Nginx
-          cat > /tmp/flask-app << 'EOL'
+          cat > /etc/nginx/sites-available/flask-app << 'EOL'
           server {
               listen 80;
               server_name 79.127.85.198;
               
               location / {
                   proxy_pass http://127.0.0.1:8000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
               }
           }
           EOL
           
-          mv /tmp/flask-app /etc/nginx/sites-available/flask-app
           ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
           nginx -t && systemctl restart nginx
-
-    - name: Copy application files
-      uses: appleboy/scp-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        source: "*.py,templates/*,static/*,*.json"
-        target: "/var/www/flask-app"
-        strip_components: 0
-
-    - name: Restart application
-      uses: appleboy/ssh-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        script: |
-          systemctl restart flask-app
           echo "Deployment completed successfully!"
