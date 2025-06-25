@@ -17,87 +17,122 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install dependencies with retries
+    - name: Install dependencies
       run: |
-        function pip_install_with_retry {
-          local max_attempts=5
-          local attempt=0
-          local success=0
-          
-          until [ $attempt -ge $max_attempts ]
-          do
-            python -m pip install --upgrade pip --default-timeout=100 && \
-            pip install --default-timeout=100 flask gunicorn && \
-            if [ -f requirements.txt ]; then pip install --default-timeout=100 -r requirements.txt; fi && \
-            success=1 && break
-            
-            attempt=$((attempt + 1))
-            echo "Attempt $attempt failed. Retrying in 5 seconds..."
-            sleep 5
-          done
-          
-          if [ $success -eq 0 ]; then
-            echo "All pip installation attempts failed"
-            exit 1
-          fi
-        }
-        
-        pip_install_with_retry
+        python -m pip install --upgrade pip
+        pip install flask gunicorn
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+    # STEP 1: Copy application files FIRST
     - name: Copy application files
       uses: appleboy/scp-action@master
       with:
-        host: '79.127.85.198'
-        username: 'root'
-        password: '133976beh'
-        source: "*.py,templates/*,static/*,*.json"
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        source: "*.py,templates/*,static/*,*.json,requirements.txt"
         target: "/var/www/flask-app"
         strip_components: 0
 
-    - name: Setup server environment
+    # STEP 2: Then configure and deploy
+    - name: Deploy to server
       uses: appleboy/ssh-action@master
       with:
-        host: '79.127.85.198'
-        username: 'root'
-        password: '133976beh'
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
         script: |
-          # Function to retry pip installations
-          pip_install_with_retry() {
-            local max_attempts=5
-            local attempt=0
-            local success=0
-            
-            until [ $attempt -ge $max_attempts ]
-            do
-              /var/www/flask-app/venv/bin/pip install --default-timeout=100 --upgrade pip && \
-              /var/www/flask-app/venv/bin/pip install --default-timeout=100 flask gunicorn && \
-              if [ -f "/var/www/flask-app/requirements.txt" ]; then 
-                /var/www/flask-app/venv/bin/pip install --default-timeout=100 -r /var/www/flask-app/requirements.txt
-              fi && \
-              success=1 && break
-              
-              attempt=$((attempt + 1))
-              echo "Attempt $attempt failed. Retrying in 5 seconds..."
-              sleep 5
-            done
-            
-            if [ $success -eq 0 ]; then
-              echo "All pip installation attempts failed"
-              exit 1
-            fi
-          }
+          # Navigate to app directory
+          cd /var/www/flask-app
           
-          # Create directory structure
-          mkdir -p /var/www/flask-app/{templates,static}
-          
-          # Setup virtual environment with retries
-          if [ ! -d "/var/www/flask-app/venv" ]; then
-            python3 -m venv /var/www/flask-app/venv || python3.10 -m venv /var/www/flask-app/venv
+          # Create virtual environment if it doesn't exist
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
           fi
           
-          # Install requirements with retry mechanism
-          pip_install_with_retry
+          # Activate virtual environment and install dependencies
+          source venv/bin/activate
           
-          # Create default requirements if missing
-          if [ ! -f "/var/www/flask-app/requirements.txt" ]; then
-            echo "flask\ngunic
+          # Install requirements
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install flask gunicorn
+          fi
+          
+          # Stop existing service if running
+          systemctl stop flask-app 2>/dev/null || true
+          
+          # Create systemd service
+          cat > /etc/systemd/system/flask-app.service << 'EOL'
+          [Unit]
+          Description=Flask App Service
+          After=network.target
+
+          [Service]
+          User=root
+          WorkingDirectory=/var/www/flask-app
+          ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000 --workers 3 --timeout 120
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          EOL
+          
+          # Reload systemd and enable service
+          systemctl daemon-reload
+          systemctl enable flask-app
+          
+          # Configure Nginx
+          cat > /etc/nginx/sites-available/flask-app << 'EOL'
+          server {
+              listen 80;
+              server_name 79.127.85.198;
+              
+              location / {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_connect_timeout 60s;
+                  proxy_send_timeout 60s;
+                  proxy_read_timeout 60s;
+              }
+          }
+          EOL
+          
+          # Enable nginx site
+          ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
+          
+          # Remove default nginx site if it exists
+          rm -f /etc/nginx/sites-enabled/default
+          
+          # Test nginx configuration
+          nginx -t
+          
+          # Restart nginx
+          systemctl restart nginx
+
+    # STEP 3: Start the application
+    - name: Start application
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        script: |
+          # Start the Flask application
+          systemctl start flask-app
+          
+          # Wait a moment for service to start
+          sleep 5
+          
+          # Check service status
+          systemctl status flask-app --no-pager
+          
+          # Check if gunicorn is listening
+          ss -tlnp | grep :8000 || echo "Warning: No process listening on port 8000"
+          
+          echo "Deployment completed!"
