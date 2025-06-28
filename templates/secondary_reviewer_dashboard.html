@@ -981,15 +981,17 @@
                                         <tr>
                                             <th>شماره نمونه</th>
                                             <th>A</th>
-                                            <th>B</th>
-                                            <th>C</th>
+                                            <th>H</th>
+                                            <th>D1</th>
+                                            <th>D2</th>
+                                            <th>R</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${Array(10).fill().map((_, rowIndex) => `
                                             <tr>
                                                 <td>${rowIndex + 1}</td>
-                                                ${Array(3).fill().map((_, colIndex) => {
+                                                ${Array(5).fill().map((_, colIndex) => {
                                                     const colName = String.fromCharCode(65 + colIndex); // A, B, C
                                                     const inputId = `dim-${submission.id}-${rowIndex}-${colName}`;
                                                     
