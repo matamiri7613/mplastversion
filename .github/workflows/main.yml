@@ -1,4 +1,4 @@
-name: Deploy Flask App on Asiatek-2
+name: Direct Creation Deploy
 
 on:
   push:
@@ -12,78 +12,114 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Install dependencies locally (for lint/tests if needed)
-      run: |
-        python -m pip install --upgrade pip
-        pip install flask gunicorn
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-    # STEP 0: Ensure target directory exists
-    - name: Ensure target directory exists on server
+    # Create the Flask app directly on the server using SSH
+    - name: Create Flask app on server
       uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
+        timeout: 600s
         script: |
+          # Create directory
           mkdir -p /var/www/flask-app
-
-    # STEP 1: Copy application files
-    - name: Copy application files to server
-      uses: appleboy/scp-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        source: |
-          *.py
-          templates/**
-          static/**
-          *.json
-          requirements.txt
-        target: "/var/www/flask-app"
-        strip_components: 0
-        debug: true
-
-    # STEP 2: Configure and deploy on server
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        script: |
-          set -e
-          
           cd /var/www/flask-app
           
-          # Create virtual environment if not exists
+          # Clean old files but keep venv
+          find . -mindepth 1 -not -path "./venv*" -delete 2>/dev/null || true
+          
+          # Create app.py (replace this with your actual Flask app code)
+          cat > app.py << 'FLASK_APP_EOF'
+          from flask import Flask, render_template, jsonify
+          import os
+
+          app = Flask(__name__)
+
+          @app.route('/')
+          def home():
+              return '''
+              <h1>🎉 Flask App Deployed Successfully!</h1>
+              <p>Your application is running on the server.</p>
+              <p><a href="/status">Check Status</a></p>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 50px; }
+                  h1 { color: #2c3e50; }
+                  a { color: #3498db; text-decoration: none; }
+              </style>
+              '''
+
+          @app.route('/status')
+          def status():
+              return jsonify({
+                  'status': 'running',
+                  'message': 'Flask application is healthy',
+                  'version': '1.0.0'
+              })
+
+          @app.route('/health')
+          def health():
+              return {'status': 'healthy'}, 200
+
+          if __name__ == '__main__':
+              app.run(debug=False, host='0.0.0.0', port=5000)
+          FLASK_APP_EOF
+          
+          # Create requirements.txt
+          cat > requirements.txt << 'REQ_EOF'
+          Flask==2.3.3
+          gunicorn==21.2.0
+          REQ_EOF
+          
+          # Create templates directory and a simple template
+          mkdir -p templates
+          cat > templates/base.html << 'TEMPLATE_EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Flask App</title>
+          </head>
+          <body>
+              <h1>Flask Application</h1>
+              <p>Successfully deployed!</p>
+          </body>
+          </html>
+          TEMPLATE_EOF
+          
+          # Create static directory
+          mkdir -p static
+          
+          # Create virtual environment
           if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
             python3 -m venv venv
           fi
           
-          # Activate venv and install dependencies
+          # Install dependencies
           source venv/bin/activate
           pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            pip install flask gunicorn
-          fi
+          pip install -r requirements.txt
           
-          # Stop existing flask-app service if running
+          echo "Flask app created successfully!"
+          ls -la
+
+    - name: Configure and start services
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        script: |
+          cd /var/www/flask-app
+          
+          # Stop existing service
           systemctl stop flask-app 2>/dev/null || true
           
-          # Create or update systemd service
-          cat > /etc/systemd/system/flask-app.service << 'EOL'
+          # Create systemd service
+          cat > /etc/systemd/system/flask-app.service << 'SERVICE_EOF'
           [Unit]
           Description=Flask App Service
           After=network.target
+
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
@@ -91,16 +127,20 @@ jobs:
           ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000 --workers 3 --timeout 120
           Restart=always
           RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
           [Install]
           WantedBy=multi-user.target
-          EOL
+          SERVICE_EOF
           
-          # Reload systemd and enable flask-app service
-          systemctl daemon-reload
-          systemctl enable flask-app
+          # Install nginx if needed
+          if ! command -v nginx &> /dev/null; then
+            apt update && apt install -y nginx
+          fi
           
-          # Configure Nginx
-          cat > /etc/nginx/sites-available/flask-app << 'EOL'
+          # Configure nginx
+          cat > /etc/nginx/sites-available/flask-app << 'NGINX_EOF'
           server {
               listen 80;
               server_name 79.127.85.198;
@@ -111,35 +151,36 @@ jobs:
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_connect_timeout 60s;
-                  proxy_send_timeout 60s;
-                  proxy_read_timeout 60s;
+              }
+              
+              location /static/ {
+                  alias /var/www/flask-app/static/;
+                  expires 1d;
               }
           }
-          EOL
+          NGINX_EOF
           
-          # Enable nginx site
+          # Enable services
           ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
-          
-          # Remove default site if exists
           rm -f /etc/nginx/sites-enabled/default
           
-          # Test nginx config
-          nginx -t
-          
-          # Restart nginx
-          systemctl restart nginx
-
-    # STEP 3: Start the application
-    - name: Start flask-app service
-      uses: appleboy/ssh-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        script: |
+          systemctl daemon-reload
+          systemctl enable flask-app
+          nginx -t && systemctl restart nginx
           systemctl start flask-app
-          sleep 5
+          
+          # Wait and check
+          sleep 15
+          
+          echo "=== Flask App Status ==="
           systemctl status flask-app --no-pager
-          ss -tlnp | grep :8000 || echo "Warning: No process listening on port 8000"
-          echo "✅ Deployment completed!"
+          
+          echo "=== Port Check ==="
+          ss -tlnp | grep :8000
+          
+          echo "=== Testing ==="
+          curl -s http://localhost:8000/status
+          
+          echo ""
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 Visit: http://79.127.85.198"
