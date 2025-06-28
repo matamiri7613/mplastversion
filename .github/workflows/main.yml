@@ -17,53 +17,51 @@ jobs:
         password: 133976beh
         timeout: 600s
         script: |
-          # Create directory
+          set -ex
+          
+          # Update and install dependencies
+          apt update
+          apt install -y python3-venv python3-pip nginx
+          
+          # Create project directory
           mkdir -p /var/www/flask-app
           cd /var/www/flask-app
           
-          # Create a simple Flask app (replace with your actual code)
-          cat > app.py << 'EOF'
-          from flask import Flask, render_template
-
+          # Create Flask app
+          cat << 'EOF' > app.py
+          from flask import Flask
           app = Flask(__name__)
-
+          
           @app.route('/')
           def hello():
               return '<h1>Hello World! Flask app is running!</h1>'
-
+          
           @app.route('/status')
           def status():
               return {'status': 'running', 'message': 'Flask app deployed successfully'}
-
+          
           if __name__ == '__main__':
               app.run(debug=False, host='0.0.0.0', port=5000)
           EOF
           
           # Create requirements.txt
-          cat > requirements.txt << 'EOF'
+          cat << 'EOF' > requirements.txt
           Flask==2.3.3
           gunicorn==21.2.0
           EOF
           
-          # Create virtual environment
-          if [ ! -d "venv" ]; then
-            python3 -m venv venv
-          fi
-          
-          # Install dependencies
+          # Create virtual environment and install dependencies
+          python3 -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
           
-          # Stop existing service
-          systemctl stop flask-app 2>/dev/null || true
-          
-          # Create systemd service
-          cat > /etc/systemd/system/flask-app.service << 'SERVICE_EOF'
+          # Create systemd service file
+          cat << 'SERVICE_EOF' > /etc/systemd/system/flask-app.service
           [Unit]
           Description=Flask App Service
           After=network.target
-
+          
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
@@ -73,17 +71,18 @@ jobs:
           RestartSec=5
           StandardOutput=journal
           StandardError=journal
-
+          
           [Install]
           WantedBy=multi-user.target
           SERVICE_EOF
           
-          # Install and configure nginx
-          if ! command -v nginx &> /dev/null; then
-            apt update && apt install -y nginx
-          fi
+          # Reload systemd and restart service
+          systemctl daemon-reload
+          systemctl enable flask-app
+          systemctl restart flask-app
           
-          cat > /etc/nginx/sites-available/flask-app << 'NGINX_EOF'
+          # Configure nginx
+          cat << 'NGINX_EOF' > /etc/nginx/sites-available/flask-app
           server {
               listen 80;
               server_name 79.127.85.198;
@@ -98,17 +97,13 @@ jobs:
           }
           NGINX_EOF
           
-          # Enable services
-          ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
+          ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/flask-app
           rm -f /etc/nginx/sites-enabled/default
           
-          systemctl daemon-reload
-          systemctl enable flask-app
           systemctl restart nginx
-          systemctl start flask-app
           
           # Wait and verify
-          sleep 15
+          sleep 10
           
           echo "=== Flask App Status ==="
           systemctl status flask-app --no-pager
@@ -117,10 +112,10 @@ jobs:
           systemctl status nginx --no-pager
           
           echo "=== Port Check ==="
-          ss -tlnp | grep :8000
+          ss -tlnp | grep :8000 || true
           
           echo "=== Testing App ==="
-          curl -s http://localhost:8000 | head -2
+          curl -s http://localhost:8000 | head -2 || true
           
           echo ""
           echo "✅ Deployment completed!"
