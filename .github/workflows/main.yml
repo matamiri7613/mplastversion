@@ -17,23 +17,40 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install dependencies locally (for lint/tests if needed)
       run: |
         python -m pip install --upgrade pip
         pip install flask gunicorn
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    # STEP 1: Copy application files FIRST
-    - name: Copy application files
+
+    # STEP 0: Ensure target directory exists
+    - name: Ensure target directory exists on server
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        script: |
+          mkdir -p /var/www/flask-app
+
+    # STEP 1: Copy application files
+    - name: Copy application files to server
       uses: appleboy/scp-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
-        source: "*.py,templates/*,static/*,*.json,requirements.txt"
+        source: |
+          *.py
+          templates/**
+          static/**
+          *.json
+          requirements.txt
         target: "/var/www/flask-app"
         strip_components: 0
+        debug: true
 
-    # STEP 2: Then configure and deploy
+    # STEP 2: Configure and deploy on server
     - name: Deploy to server
       uses: appleboy/ssh-action@master
       with:
@@ -41,28 +58,28 @@ jobs:
         username: root
         password: 133976beh
         script: |
-          # Navigate to app directory
+          set -e
+          
           cd /var/www/flask-app
           
-          # Create virtual environment if it doesn't exist
+          # Create virtual environment if not exists
           if [ ! -d "venv" ]; then
             python3 -m venv venv
           fi
           
-          # Activate virtual environment and install dependencies
+          # Activate venv and install dependencies
           source venv/bin/activate
-          
-          # Install requirements
+          pip install --upgrade pip
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
             pip install flask gunicorn
           fi
           
-          # Stop existing service if running
+          # Stop existing flask-app service if running
           systemctl stop flask-app 2>/dev/null || true
           
-          # Create systemd service
+          # Create or update systemd service
           cat > /etc/systemd/system/flask-app.service << 'EOL'
           [Unit]
           Description=Flask App Service
@@ -70,6 +87,7 @@ jobs:
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
+          Environment=PATH=/var/www/flask-app/venv/bin
           ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000 --workers 3 --timeout 120
           Restart=always
           RestartSec=5
@@ -77,7 +95,7 @@ jobs:
           WantedBy=multi-user.target
           EOL
           
-          # Reload systemd and enable service
+          # Reload systemd and enable flask-app service
           systemctl daemon-reload
           systemctl enable flask-app
           
@@ -103,32 +121,25 @@ jobs:
           # Enable nginx site
           ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
           
-          # Remove default nginx site if it exists
+          # Remove default site if exists
           rm -f /etc/nginx/sites-enabled/default
           
-          # Test nginx configuration
+          # Test nginx config
           nginx -t
           
           # Restart nginx
           systemctl restart nginx
+
     # STEP 3: Start the application
-    - name: Start application
+    - name: Start flask-app service
       uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
         script: |
-          # Start the Flask application
           systemctl start flask-app
-          
-          # Wait a moment for service to start
           sleep 5
-          
-          # Check service status
           systemctl status flask-app --no-pager
-          
-          # Check if gunicorn is listening
           ss -tlnp | grep :8000 || echo "Warning: No process listening on port 8000"
-          
-          echo "Deployment completed!"
+          echo "✅ Deployment completed!"
