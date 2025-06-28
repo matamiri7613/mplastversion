@@ -23,27 +23,55 @@ jobs:
         pip install flask gunicorn
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # STEP 1: Copy application files FIRST
-    - name: Copy application files
-      uses: appleboy/scp-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        source: "*.py,templates/*,static/*,*.json,requirements.txt"
-        target: "/var/www/flask-app"
-        strip_components: 0
-
-    # STEP 2: Then configure and deploy
-    - name: Deploy to server
+    # STEP 1: Prepare server directory structure
+    - name: Prepare server directories
       uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
         script: |
+          # Create directory structure
+          mkdir -p /var/www/flask-app
+          mkdir -p /var/www/flask-app/templates
+          mkdir -p /var/www/flask-app/static
+          
+          # Set proper permissions
+          chmod -R 755 /var/www/flask-app
+          
+          # Clean old files if they exist
+          rm -rf /var/www/flask-app/*
+
+    # STEP 2: Copy application files with better error handling
+    - name: Copy application files
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        source: "."
+        target: "/var/www/flask-app/"
+        rm: false
+        strip_components: 1
+        overwrite: true
+        tar_tmp_path: "/tmp/"
+        timeout: 300s
+
+    # STEP 3: Configure and deploy
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        timeout: 300s
+        script: |
           # Navigate to app directory
           cd /var/www/flask-app
+          
+          # List files to verify copy was successful
+          echo "Files in /var/www/flask-app:"
+          ls -la
           
           # Create virtual environment if it doesn't exist
           if [ ! -d "venv" ]; then
@@ -52,6 +80,9 @@ jobs:
           
           # Activate virtual environment and install dependencies
           source venv/bin/activate
+          
+          # Upgrade pip first
+          pip install --upgrade pip
           
           # Install requirements
           if [ -f requirements.txt ]; then
@@ -72,6 +103,7 @@ jobs:
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
+          Environment=PATH=/var/www/flask-app/venv/bin
           ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000 --workers 3 --timeout 120
           Restart=always
           RestartSec=5
@@ -83,6 +115,13 @@ jobs:
           # Reload systemd and enable service
           systemctl daemon-reload
           systemctl enable flask-app
+          
+          # Check if nginx is installed
+          if ! command -v nginx &> /dev/null; then
+            echo "Installing nginx..."
+            apt update
+            apt install -y nginx
+          fi
           
           # Configure Nginx
           cat > /etc/nginx/sites-available/flask-app << 'EOL'
@@ -115,24 +154,36 @@ jobs:
           # Restart nginx
           systemctl restart nginx
 
-    # STEP 3: Start the application
+    # STEP 4: Start the application
     - name: Start application
       uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
+        timeout: 120s
         script: |
           # Start the Flask application
           systemctl start flask-app
           
           # Wait a moment for service to start
-          sleep 5
+          sleep 10
           
           # Check service status
-          systemctl status flask-app --no-pager
+          echo "=== Flask App Service Status ==="
+          systemctl status flask-app --no-pager -l
           
           # Check if gunicorn is listening
+          echo "=== Checking port 8000 ==="
           ss -tlnp | grep :8000 || echo "Warning: No process listening on port 8000"
+          
+          # Check nginx status
+          echo "=== Nginx Status ==="
+          systemctl status nginx --no-pager
+          
+          # Test the application
+          echo "=== Testing application ==="
+          curl -I http://localhost:8000 || echo "Local test failed"
+          curl -I http://79.127.85.198 || echo "External test failed"
           
           echo "Deployment completed!"
