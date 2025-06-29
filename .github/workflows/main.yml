@@ -24,17 +24,7 @@ jobs:
         pip install flask gunicorn
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         
-    - name: Copy application files to server
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        source: "."
-        target: "/var/www/flask-app"
-        rm: true
-        
-    - name: Setup and deploy application
+    - name: Deploy to server using Git
       uses: appleboy/ssh-action@v0.1.7
       with:
         host: 79.127.85.198
@@ -43,12 +33,28 @@ jobs:
         script: |
           echo "Starting deployment process..."
           
-          # Navigate to app directory
-          cd /var/www/flask-app
-          
           # Install system dependencies if needed
           apt update
-          apt install -y python3 python3-pip python3-venv nginx
+          apt install -y python3 python3-pip python3-venv nginx git
+          
+          # Set up the application directory
+          APP_DIR="/var/www/flask-app"
+          REPO_URL="https://github.com/${{ github.repository }}.git"
+          
+          # Create app directory and navigate to it
+          mkdir -p $APP_DIR
+          cd $APP_DIR
+          
+          # Clone or update the repository
+          if [ -d ".git" ]; then
+            echo "Updating existing repository..."
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+          else
+            echo "Cloning repository..."
+            git clone $REPO_URL .
+          fi
           
           # Create virtual environment
           if [ ! -d "venv" ]; then
@@ -72,6 +78,7 @@ jobs:
           timeout = 30
           keepalive = 2
           max_requests = 1000
+          daemon = False
           EOF
           
           # Create systemd service file
@@ -86,6 +93,8 @@ jobs:
           ExecStart=/var/www/flask-app/venv/bin/gunicorn -c gunicorn.conf.py app:app
           Restart=always
           RestartSec=3
+          StandardOutput=journal
+          StandardError=journal
           
           [Install]
           WantedBy=multi-user.target
@@ -103,6 +112,7 @@ jobs:
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_redirect off;
               }
               
               location /static {
@@ -128,10 +138,13 @@ jobs:
           chown -R root:root /var/www/flask-app
           chmod -R 755 /var/www/flask-app
           
+          # Stop services if running
+          systemctl stop flask-app 2>/dev/null || true
+          
           # Reload systemd and start services
           systemctl daemon-reload
           systemctl enable flask-app
-          systemctl restart flask-app
+          systemctl start flask-app
           systemctl restart nginx
           
           # Wait a moment for services to start
@@ -142,7 +155,8 @@ jobs:
             echo "✅ Flask app service is running"
           else
             echo "❌ Flask app service failed to start"
-            systemctl status flask-app
+            echo "Service logs:"
+            journalctl -u flask-app -n 20 --no-pager
             exit 1
           fi
           
@@ -150,7 +164,7 @@ jobs:
             echo "✅ Nginx service is running"
           else
             echo "❌ Nginx service failed to start"
-            systemctl status nginx
+            systemctl status nginx --no-pager
             exit 1
           fi
           
@@ -160,12 +174,21 @@ jobs:
     - name: Health check
       run: |
         echo "Performing health check..."
-        sleep 10
+        sleep 15
         
-        response=$(curl -s -o /dev/null -w "%{http_code}" http://79.127.85.198 || echo "000")
-        
-        if [ "$response" = "200" ]; then
-          echo "✅ Health check passed - App is responding"
-        else
-          echo "⚠️ Health check warning - Got HTTP $response"
-        fi
+        # Try multiple times in case the app is still starting
+        for i in {1..5}; do
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://79.127.85.198 || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Health check passed - App is responding (attempt $i)"
+            break
+          else
+            echo "⏳ Health check attempt $i - Got HTTP $response, retrying..."
+            sleep 5
+          fi
+          
+          if [ $i -eq 5 ]; then
+            echo "⚠️ Health check completed with HTTP $response after 5 attempts"
+          fi
+        done
