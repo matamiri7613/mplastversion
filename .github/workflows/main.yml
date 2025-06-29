@@ -1,4 +1,4 @@
-name: Direct Creation Deploy
+name: Deploy Flask App on Asiatek-2
 
 on:
   push:
@@ -12,135 +12,77 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # Create the Flask app directly on the server using SSH
-    - name: Create Flask app on server
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flask gunicorn
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    # STEP 1: Copy application files FIRST
+    - name: Copy application files
+      uses: appleboy/scp-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        source: "*.py,templates/*,static/*,*.json,requirements.txt"
+        target: "/var/www/flask-app"
+        strip_components: 0
+
+    # STEP 2: Then configure and deploy
+    - name: Deploy to server
       uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
-        timeout: 600s
         script: |
-          # Create directory
-          mkdir -p /var/www/flask-app
+          # Navigate to app directory
           cd /var/www/flask-app
           
-          # Clean old files but keep venv
-          find . -mindepth 1 -not -path "./venv*" -delete 2>/dev/null || true
-          
-          # Create app.py (replace this with your actual Flask app code)
-          cat > app.py << 'FLASK_APP_EOF'
-          from flask import Flask, render_template, jsonify
-          import os
-
-          app = Flask(__name__)
-
-          @app.route('/')
-          def home():
-              return '''
-              <h1>🎉 Flask App Deployed Successfully!</h1>
-              <p>Your application is running on the server.</p>
-              <p><a href="/status">Check Status</a></p>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 50px; }
-                  h1 { color: #2c3e50; }
-                  a { color: #3498db; text-decoration: none; }
-              </style>
-              '''
-
-          @app.route('/status')
-          def status():
-              return jsonify({
-                  'status': 'running',
-                  'message': 'Flask application is healthy',
-                  'version': '1.0.0'
-              })
-
-          @app.route('/health')
-          def health():
-              return {'status': 'healthy'}, 200
-
-          if __name__ == '__main__':
-              app.run(debug=False, host='0.0.0.0', port=5000)
-          FLASK_APP_EOF
-          
-          # Create requirements.txt
-          cat > requirements.txt << 'REQ_EOF'
-          Flask==2.3.3
-          gunicorn==21.2.0
-          REQ_EOF
-          
-          # Create templates directory and a simple template
-          mkdir -p templates
-          cat > templates/base.html << 'TEMPLATE_EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>Flask App</title>
-          </head>
-          <body>
-              <h1>Flask Application</h1>
-              <p>Successfully deployed!</p>
-          </body>
-          </html>
-          TEMPLATE_EOF
-          
-          # Create static directory
-          mkdir -p static
-          
-          # Create virtual environment
+          # Create virtual environment if it doesn't exist
           if [ ! -d "venv" ]; then
-            echo "Creating virtual environment..."
             python3 -m venv venv
           fi
           
-          # Install dependencies
+          # Activate virtual environment and install dependencies
           source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
           
-          echo "Flask app created successfully!"
-          ls -la
-
-    - name: Configure and start services
-      uses: appleboy/ssh-action@master
-      with:
-        host: 79.127.85.198
-        username: root
-        password: 133976beh
-        script: |
-          cd /var/www/flask-app
+          # Install requirements
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install flask gunicorn
+          fi
           
-          # Stop existing service
+          # Stop existing service if running
           systemctl stop flask-app 2>/dev/null || true
           
           # Create systemd service
-          cat > /etc/systemd/system/flask-app.service << 'SERVICE_EOF'
+          cat > /etc/systemd/system/flask-app.service << 'EOL'
           [Unit]
           Description=Flask App Service
           After=network.target
-
           [Service]
           User=root
           WorkingDirectory=/var/www/flask-app
-          Environment=PATH=/var/www/flask-app/venv/bin
           ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000 --workers 3 --timeout 120
           Restart=always
           RestartSec=5
-          StandardOutput=journal
-          StandardError=journal
-
           [Install]
           WantedBy=multi-user.target
-          SERVICE_EOF
+          EOL
           
-          # Install nginx if needed
-          if ! command -v nginx &> /dev/null; then
-            apt update && apt install -y nginx
-          fi
+          # Reload systemd and enable service
+          systemctl daemon-reload
+          systemctl enable flask-app
           
-          # Configure nginx
-          cat > /etc/nginx/sites-available/flask-app << 'NGINX_EOF'
+          # Configure Nginx
+          cat > /etc/nginx/sites-available/flask-app << 'EOL'
           server {
               listen 80;
               server_name 79.127.85.198;
@@ -151,36 +93,42 @@ jobs:
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
-              }
-              
-              location /static/ {
-                  alias /var/www/flask-app/static/;
-                  expires 1d;
+                  proxy_connect_timeout 60s;
+                  proxy_send_timeout 60s;
+                  proxy_read_timeout 60s;
               }
           }
-          NGINX_EOF
+          EOL
           
-          # Enable services
+          # Enable nginx site
           ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
+          
+          # Remove default nginx site if it exists
           rm -f /etc/nginx/sites-enabled/default
           
-          systemctl daemon-reload
-          systemctl enable flask-app
-          nginx -t && systemctl restart nginx
+          # Test nginx configuration
+          nginx -t
+          
+          # Restart nginx
+          systemctl restart nginx
+    # STEP 3: Start the application
+    - name: Start application
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        script: |
+          # Start the Flask application
           systemctl start flask-app
           
-          # Wait and check
-          sleep 15
+          # Wait a moment for service to start
+          sleep 5
           
-          echo "=== Flask App Status ==="
+          # Check service status
           systemctl status flask-app --no-pager
           
-          echo "=== Port Check ==="
-          ss -tlnp | grep :8000
+          # Check if gunicorn is listening
+          ss -tlnp | grep :8000 || echo "Warning: No process listening on port 8000"
           
-          echo "=== Testing ==="
-          curl -s http://localhost:8000/status
-          
-          echo ""
-          echo "✅ Deployment completed successfully!"
-          echo "🌐 Visit: http://79.127.85.198"
+          echo "Deployment completed!"
