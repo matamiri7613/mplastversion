@@ -1,182 +1,108 @@
-# .github/workflows/deploy.yml
-name: Deploy Flask App to Server
+name: Deploy Flask App
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:  # Allow manual trigger
+    branches: [ main ]  # Change this to your main branch name if different
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
       
-    - name: Setup Python
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10'
         
-    - name: Install Dependencies and Test
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        # Optional: Run tests here
-        # python -m pytest tests/
+        pip install flask gunicorn
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         
-    - name: Deploy to Server
-      uses: appleboy/ssh-action@v0.1.7
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
       with:
         host: 79.127.85.198
         username: root
         password: 133976beh
-        port: 22
         script: |
-          echo "Starting deployment..."
+          # Create directory if it doesn't exist
+          mkdir -p /var/www/flask-app
           
-          # Set variables
-          APP_DIR="/var/www/flask-app"
-          REPO_URL="https://github.com/${{ github.repository }}.git"
-          
-          # Create app directory if it doesn't exist
-          sudo mkdir -p $APP_DIR
-          cd $APP_DIR
-          
-          # Clone or update repository
-          if [ -d ".git" ]; then
-            echo "Updating existing repository..."
-            git fetch origin
-            git reset --hard origin/main
-            git clean -fd
-          else
-            echo "Cloning repository..."
-            git clone $REPO_URL .
+          # Create virtual environment if it doesn't exist
+          if [ ! -d "/var/www/flask-app/venv" ]; then
+            python3 -m venv /var/www/flask-app/venv
           fi
           
-          # Set up virtual environment
-          echo "Setting up virtual environment..."
-          python3 -m venv venv
-          source venv/bin/activate
+          # Activate virtual environment and install dependencies
+          source /var/www/flask-app/venv/bin/activate
+          pip install flask gunicorn
           
-          # Upgrade pip and install dependencies
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          
-          # Set proper permissions
-          sudo chown -R www-data:www-data $APP_DIR
-          sudo chmod -R 755 $APP_DIR
-          
-          # Create or update Gunicorn config if it doesn't exist
-          if [ ! -f "gunicorn.conf.py" ]; then
-            cat > gunicorn.conf.py << 'EOF'
-          bind = "127.0.0.1:5000"
-          workers = 2
-          worker_class = "sync"
-          timeout = 30
-          keepalive = 2
-          max_requests = 1000
-          max_requests_jitter = 100
-          preload_app = True
-          accesslog = "/var/log/gunicorn_access.log"
-          errorlog = "/var/log/gunicorn_error.log"
-          loglevel = "info"
-          EOF
+          # Create a temporary file for comparing if requirements.txt exists
+          echo "flask\ngunicorn" > /tmp/default_requirements.txt
+          if [ ! -f "/var/www/flask-app/requirements.txt" ]; then
+            cp /tmp/default_requirements.txt /var/www/flask-app/requirements.txt
           fi
           
-          # Create Nginx config if it doesn't exist
-          if [ ! -f "/etc/nginx/sites-available/flask-app" ]; then
-            sudo tee /etc/nginx/sites-available/flask-app > /dev/null << 'EOF'
+          pip install -r /var/www/flask-app/requirements.txt
+          
+          # Create or update systemd service
+          cat > /tmp/flask-app.service << 'EOL'
+          [Unit]
+          Description=Flask App Service
+          After=network.target
+          
+          [Service]
+          User=root
+          WorkingDirectory=/var/www/flask-app
+          ExecStart=/var/www/flask-app/venv/bin/gunicorn app:app -b 127.0.0.1:8000
+          Restart=always
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOL
+          
+          mv /tmp/flask-app.service /etc/systemd/system/flask-app.service
+          systemctl daemon-reload
+          
+          # Configure Nginx
+          cat > /tmp/flask-app << 'EOL'
           server {
               listen 80;
               server_name 79.127.85.198;
               
-              client_max_body_size 10M;
-              
               location / {
-                  proxy_pass http://127.0.0.1:5000;
+                  proxy_pass http://127.0.0.1:8000;
                   proxy_set_header Host $host;
                   proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_redirect off;
-                  proxy_buffering off;
-              }
-              
-              location /static {
-                  alias /var/www/flask-app/static;
-                  expires 1y;
-                  add_header Cache-Control "public, immutable";
-              }
-              
-              location /favicon.ico {
-                  alias /var/www/flask-app/static/favicon.ico;
               }
           }
-          EOF
-            
-            # Enable the site
-            sudo ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
-            sudo rm -f /etc/nginx/sites-enabled/default
-          fi
+          EOL
           
-          # Create Supervisor config if it doesn't exist
-          if [ ! -f "/etc/supervisor/conf.d/flask-app.conf" ]; then
-            sudo tee /etc/supervisor/conf.d/flask-app.conf > /dev/null << 'EOF'
-          [program:flask-app]
-          command=/var/www/flask-app/venv/bin/gunicorn -c gunicorn.conf.py app:app
-          directory=/var/www/flask-app
-          user=www-data
-          autostart=true
-          autorestart=true
-          redirect_stderr=true
-          stdout_logfile=/var/log/flask-app.log
-          stderr_logfile=/var/log/flask-app-error.log
-          environment=PATH="/var/www/flask-app/venv/bin"
-          EOF
-          fi
+          mv /tmp/flask-app /etc/nginx/sites-available/flask-app
+          ln -sf /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/
+          nginx -t && systemctl restart nginx
           
-          # Test Nginx configuration
-          sudo nginx -t
-          
-          # Reload/restart services
-          echo "Reloading services..."
-          sudo supervisorctl reread
-          sudo supervisorctl update
-          sudo supervisorctl restart flask-app
-          sudo systemctl reload nginx
-          
-          # Check if services are running
-          echo "Checking service status..."
-          sudo supervisorctl status flask-app
-          sudo systemctl is-active nginx
-          
+    - name: Copy application files
+      uses: appleboy/scp-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        source: "*.py,templates/*,static/*,*.json"
+        target: "/var/www/flask-app"
+        strip_components: 0
+        
+    - name: Restart application
+      uses: appleboy/ssh-action@master
+      with:
+        host: 79.127.85.198
+        username: root
+        password: 133976beh
+        script: |
+          systemctl restart flask-app
           echo "Deployment completed successfully!"
-          echo "App should be available at: http://79.127.85.198"
-          
-    - name: Health Check
-      run: |
-        echo "Waiting for application to start..."
-        sleep 10
-        
-        # Try to check if the app is responding
-        curl_output=$(curl -s -o /dev/null -w "%{http_code}" http://79.127.85.198 || echo "000")
-        
-        if [ "$curl_output" = "200" ]; then
-          echo "✅ Application is responding successfully!"
-        else
-          echo "⚠️  Application might not be responding properly (HTTP $curl_output)"
-          echo "Check server logs for more details"
-        fi
-        
-    - name: Notify Deployment Status
-      if: always()
-      run: |
-        if [ "${{ job.status }}" = "success" ]; then
-          echo "🎉 Deployment successful!"
-          echo "Your Flask app is now live at: http://79.127.85.198"
-        else
-          echo "❌ Deployment failed!"
-          echo "Check the logs above for more details"
-        fi
